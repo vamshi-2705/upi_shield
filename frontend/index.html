@@ -1042,7 +1042,7 @@ function setMode(m){
   }
 
   // Try backend
-  fetch('http://localhost:8000/api/scenario',{
+  fetch('http://https://upi-shield-api.onrender.com/api/scenario',{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({mode:m})
   }).catch(()=>{});
@@ -1053,7 +1053,7 @@ function triggerManual(){
   addTransaction(txn);
   selectTxn(txn.txnId);
 
-  fetch('http://localhost:8000/api/trigger-fraud',{method:'POST'}).catch(()=>{});
+  fetch('http://https://upi-shield-api.onrender.com/api/trigger-fraud',{method:'POST'}).catch(()=>{});
 }
 
 function addTransaction(raw){
@@ -1605,7 +1605,7 @@ let wsConnected=false;
 
 function connectWS(){
   try{
-    const ws=new WebSocket('ws://localhost:8000/ws');
+    const ws=new WebSocket('ws://https://upi-shield-api.onrender.com/ws');
     ws.onopen=()=>{
       wsConnected=true;
       document.getElementById('liveDot').style.background='#3fb950';
