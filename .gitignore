@@ -1,0 +1,8 @@
+# Create this file to avoid pushing junk
+echo "__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+*.csv
+node_modules/" > .gitignore
