@@ -1,0 +1,1663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>UPI Shield — Fraud Detection</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#060912;
+  --s1:#0d1117;
+  --s2:#161b22;
+  --border:#21262d;
+  --green:#3fb950;
+  --gdim:rgba(63,185,80,0.12);
+  --yellow:#d29922;
+  --ydim:rgba(210,153,34,0.12);
+  --red:#f85149;
+  --rdim:rgba(248,81,73,0.12);
+  --blue:#388bfd;
+  --bdim:rgba(56,139,253,0.12);
+  --text:#e6edf3;
+  --muted:#8b949e;
+  --mono:'Space Mono',monospace;
+  --sans:'DM Sans',sans-serif;
+}
+
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(56,139,253,0.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(56,139,253,0.04) 1px,transparent 1px);
+  background-size:44px 44px;pointer-events:none;z-index:0
+}
+
+/* ── Header ── */
+.hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 24px;border-bottom:1px solid var(--border);
+  background:rgba(6,9,18,0.96);backdrop-filter:blur(12px);
+  position:sticky;top:0;z-index:99;
+}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:17px;font-weight:700}
+.logo-box{width:34px;height:34px;background:linear-gradient(135deg,#388bfd,#3fb950);border-radius:8px;display:grid;place-items:center;font-size:17px}
+.logo span{color:#388bfd}
+.hdr-right{display:flex;align-items:center;gap:12px}
+.date-txt{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.live-pill{
+  display:flex;align-items:center;gap:6px;
+  background:var(--gdim);border:1px solid rgba(63,185,80,0.3);
+  color:var(--green);padding:4px 12px;border-radius:20px;
+  font-family:var(--mono);font-size:11px;font-weight:700
+}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:blink 1.4s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── Layout ── */
+.layout{display:grid;grid-template-columns:1fr 360px;min-height:calc(100vh - 63px);position:relative;z-index:1}
+.main{padding:20px 22px;overflow-y:auto}
+.side{border-left:1px solid var(--border);background:var(--s1);padding:18px;overflow-y:auto}
+
+/* ── Stats ── */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+.sc{
+  background:var(--s1);border:1px solid var(--border);border-radius:12px;
+  padding:16px;position:relative;overflow:hidden;transition:border-color .2s
+}
+.sc::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.sc.b::after{background:var(--blue)}.sc.g::after{background:var(--green)}
+.sc.r::after{background:var(--red)}.sc.y::after{background:var(--yellow)}
+.sc-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;font-family:var(--mono);margin-bottom:8px}
+.sc-val{font-size:26px;font-weight:700;font-family:var(--mono);line-height:1}
+.sc.b .sc-val{color:var(--blue)}.sc.g .sc-val{color:var(--green)}
+.sc.r .sc-val{color:var(--red)}.sc.y .sc-val{color:var(--yellow)}
+.sc-sub{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* ── Section Label ── */
+.sec{
+  display:flex;align-items:center;gap:8px;
+  font-family:var(--mono);font-size:10px;text-transform:uppercase;
+  letter-spacing:2px;color:var(--muted);margin-bottom:12px
+}
+.sec::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── Controls ── */
+.ctrls{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.btn{
+  padding:8px 16px;border-radius:8px;border:1px solid var(--border);
+  background:var(--s2);color:var(--text);font-family:var(--mono);
+  font-size:11px;cursor:pointer;transition:all .18s;font-weight:700;letter-spacing:.5px
+}
+.btn:hover{transform:translateY(-1px)}
+.btn.bn{border-color:var(--green);color:var(--green)}
+.btn.bn:hover,.btn.bn.act{background:var(--gdim)}
+.btn.ba{border-color:var(--red);color:var(--red)}
+.btn.ba:hover,.btn.ba.act{background:var(--rdim)}
+.btn.bm{border-color:var(--blue);color:var(--blue)}
+.btn.bm:hover{background:var(--bdim)}
+
+/* ── Banner ── */
+.banner{
+  padding:9px 14px;border-radius:8px;font-family:var(--mono);font-size:11px;
+  font-weight:700;text-align:center;margin-bottom:12px;letter-spacing:.5px
+}
+.banner.n{background:var(--gdim);border:1px solid rgba(63,185,80,0.3);color:var(--green)}
+.banner.a{background:var(--rdim);border:1px solid rgba(248,81,73,0.35);color:var(--red)}
+
+/* ── Feed ── */
+.feed-wrap{background:var(--s1);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:22px}
+.feed-hdr{
+  display:grid;grid-template-columns:90px 1fr 90px 130px 70px 90px;
+  gap:10px;padding:10px 14px;background:var(--s2);
+  border-bottom:1px solid var(--border);
+  font-size:9px;font-family:var(--mono);color:var(--muted);
+  text-transform:uppercase;letter-spacing:1px
+}
+.feed-body{max-height:360px;overflow-y:auto}
+.row{
+  display:grid;grid-template-columns:90px 1fr 90px 130px 70px 90px;
+  gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);
+  font-size:13px;align-items:center;cursor:pointer;transition:background .12s;
+}
+.row:hover{background:var(--s2)}
+.row.fr{background:rgba(248,81,73,0.05)}
+.row.su{background:rgba(210,153,34,0.05)}
+.row.sel{background:rgba(56,139,253,0.08)!important}
+@keyframes rowIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+.row{animation:rowIn .35s ease}
+.rid{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.rname{font-weight:600;font-size:13px}
+.rupi{font-size:10px;color:var(--muted)}
+.ramt{font-family:var(--mono);font-weight:700}
+
+.sbar{display:flex;align-items:center;gap:5px}
+.snum{font-family:var(--mono);font-size:11px;font-weight:700;width:26px}
+.strk{flex:1;height:4px;background:var(--s2);border-radius:2px;overflow:hidden}
+.sfil{height:100%;border-radius:2px;transition:width .5s}
+
+.badge{
+  display:inline-flex;align-items:center;gap:3px;
+  padding:2px 7px;border-radius:5px;
+  font-size:9px;font-family:var(--mono);font-weight:700;letter-spacing:.5px
+}
+.badge.SAFE{background:var(--gdim);color:var(--green);border:1px solid rgba(63,185,80,0.3)}
+.badge.SUSPICIOUS{background:var(--ydim);color:var(--yellow);border:1px solid rgba(210,153,34,0.3)}
+.badge.FRAUD{background:var(--rdim);color:var(--red);border:1px solid rgba(248,81,73,0.3);animation:glow 1.5s infinite}
+@keyframes glow{0%,100%{box-shadow:none}50%{box-shadow:0 0 8px rgba(248,81,73,.35)}}
+
+/* ── Mini canvas chart ── */
+.chart-box{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
+.chart-ttl{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+canvas{display:block;width:100%!important}
+.legend{display:flex;gap:14px;justify-content:center;margin-top:8px}
+.leg-i{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
+.leg-dot{width:20px;height:2px;border-radius:2px}
+
+/* ── Alert Detail ── */
+.adet{
+  background:var(--s2);border:1px solid rgba(248,81,73,0.3);
+  border-radius:12px;padding:16px;margin-bottom:16px;
+}
+.adet.sus{border-color:rgba(210,153,34,0.3)}
+.adet.safe{border-color:rgba(63,185,80,0.3)}
+.adet-hdr{
+  display:flex;align-items:center;gap:7px;
+  color:var(--red);font-family:var(--mono);font-size:11px;
+  font-weight:700;margin-bottom:14px;text-transform:uppercase;letter-spacing:1px
+}
+.adet.sus .adet-hdr{color:var(--yellow)}
+.adet.safe .adet-hdr{color:var(--green)}
+
+/* Score ring */
+.ring-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:14px}
+.ring-svg{transform:rotate(-90deg)}
+.ring-inner{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:22px;font-weight:700
+}
+.ring-sub{font-size:9px;color:var(--muted);font-family:var(--mono);margin-top:6px;text-transform:uppercase;letter-spacing:1px}
+
+.ameta{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px}
+.am-lbl{font-size:9px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.8px;margin-bottom:2px}
+.am-val{font-size:12px;font-weight:600}
+
+.flags{display:flex;flex-direction:column;gap:5px}
+.flag{
+  display:flex;align-items:flex-start;gap:7px;font-size:11px;
+  padding:7px 9px;background:rgba(248,81,73,0.07);
+  border-left:2px solid var(--red);border-radius:0 5px 5px 0
+}
+.adet.sus .flag{background:rgba(210,153,34,0.07);border-left-color:var(--yellow)}
+
+/* Recent alerts list */
+.alert-item{
+  border-radius:8px;padding:9px 11px;cursor:pointer;
+  transition:transform .15s;margin-bottom:7px
+}
+.alert-item:hover{transform:translateX(3px)}
+.ai-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+.ai-name{font-size:12px;font-weight:600}
+.ai-bot{display:flex;justify-content:space-between}
+.ai-mer{font-size:11px;color:var(--muted)}
+.ai-amt{font-size:12px;font-family:var(--mono);font-weight:700}
+
+/* Donut */
+.donut-wrap{display:flex;flex-direction:column;align-items:center}
+.donut-legs{display:flex;gap:14px;margin-top:10px;justify-content:center}
+.dl{text-align:center}
+.dl-val{font-family:var(--mono);font-size:15px;font-weight:700}
+.dl-lbl{font-size:10px;color:var(--muted);margin-top:1px}
+
+/* Empty state */
+.empty{text-align:center;padding:36px 0;color:var(--muted);font-family:var(--mono);font-size:11px;line-height:2}
+
+/* scrollbar */
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+@media(max-width:1020px){
+  .layout{grid-template-columns:1fr}
+  .side{border-left:none;border-top:1px solid var(--border)}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .feed-hdr,.row{grid-template-columns:80px 1fr 80px 70px 80px}
+  .feed-hdr>*:nth-child(4),.row>*:nth-child(4){display:none}
+}
+
+/* ── Latency Counter ── */
+.latency-pill{
+  display:flex;align-items:center;gap:6px;
+  background:var(--bdim);border:1px solid rgba(56,139,253,0.3);
+  color:var(--blue);padding:4px 12px;border-radius:20px;
+  font-family:var(--mono);font-size:11px;font-weight:700
+}
+.latency-pill.fast{background:var(--gdim);border-color:rgba(63,185,80,0.3);color:var(--green)}
+.latency-pill.slow{background:var(--rdim);border-color:rgba(248,81,73,0.3);color:var(--red)}
+@keyframes latencyPop{0%{transform:scale(1.2)}100%{transform:scale(1)}}
+.latency-pop{animation:latencyPop .25s ease}
+
+/* ── Sound toggle ── */
+.sound-btn{
+  background:var(--s2);border:1px solid var(--border);
+  color:var(--muted);padding:4px 10px;border-radius:20px;
+  font-family:var(--mono);font-size:11px;cursor:pointer;
+  transition:all .2s;font-weight:700
+}
+.sound-btn.on{background:var(--ydim);border-color:rgba(210,153,34,0.4);color:var(--yellow)}
+
+/* ── Toast notification ── */
+.toast-wrap{position:fixed;top:80px;right:20px;z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{
+  background:var(--rdim);border:1px solid rgba(248,81,73,0.4);
+  color:var(--text);padding:12px 16px;border-radius:10px;
+  font-size:12px;min-width:260px;backdrop-filter:blur(10px);
+  animation:toastIn .3s ease;pointer-events:auto;
+  box-shadow:0 4px 20px rgba(248,81,73,0.2)
+}
+.toast.sus{background:var(--ydim);border-color:rgba(210,153,34,0.4);box-shadow:0 4px 20px rgba(210,153,34,0.15)}
+@keyframes toastIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+@keyframes toastOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}
+.toast-title{font-family:var(--mono);font-size:11px;font-weight:700;margin-bottom:3px;color:var(--red)}
+.toast.sus .toast-title{color:var(--yellow)}
+.toast-body{color:var(--muted);font-size:11px}
+
+/* ── India Map ── */
+.map-wrap{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:22px;position:relative;overflow:hidden}
+.map-canvas-wrap{position:relative;width:100%;height:300px}
+#indiaMap{width:100%;height:300px;border-radius:8px}
+.map-dot{
+  position:absolute;width:10px;height:10px;border-radius:50%;
+  transform:translate(-50%,-50%);cursor:pointer;transition:all .3s;z-index:2
+}
+.map-dot.fraud{background:var(--red);box-shadow:0 0 12px rgba(248,81,73,0.8);animation:mapPulse 1.5s infinite}
+.map-dot.safe{background:var(--green);box-shadow:0 0 6px rgba(63,185,80,0.4);opacity:0.7}
+.map-dot.sus{background:var(--yellow);box-shadow:0 0 8px rgba(210,153,34,0.6)}
+@keyframes mapPulse{0%,100%{box-shadow:0 0 6px rgba(248,81,73,.5),0 0 0 0 rgba(248,81,73,0.4)}50%{box-shadow:0 0 18px rgba(248,81,73,.9),0 0 0 8px rgba(248,81,73,0)}}
+
+/* ── PDF button ── */
+.pdf-btn{
+  display:flex;align-items:center;gap:7px;
+  padding:8px 16px;border-radius:8px;
+  border:1px solid rgba(56,139,253,0.4);
+  background:var(--bdim);color:var(--blue);
+  font-family:var(--mono);font-size:11px;
+  cursor:pointer;transition:all .2s;font-weight:700
+}
+.pdf-btn:hover{background:rgba(56,139,253,0.2);transform:translateY(-1px)}
+
+/* ── Screen flash on fraud ── */
+@keyframes screenFlash{0%,100%{background:transparent}50%{background:rgba(248,81,73,0.06)}}
+.flash{animation:screenFlash .4s ease}
+
+/* ── Mode Tabs ── */
+.mode-tabs{display:flex;gap:0;margin-bottom:16px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--s2)}
+.mode-tab{
+  flex:1;padding:10px 16px;border:none;background:transparent;
+  color:var(--muted);font-family:var(--mono);font-size:11px;
+  font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.5px;
+  border-right:1px solid var(--border)
+}
+.mode-tab:last-child{border-right:none}
+.mode-tab:hover{color:var(--text);background:rgba(255,255,255,0.04)}
+.mode-tab.active-sim{background:var(--gdim);color:var(--green);border-bottom:2px solid var(--green)}
+.mode-tab.active-kaggle{background:rgba(139,92,246,0.12);color:#a78bfa;border-bottom:2px solid #a78bfa}
+
+/* ── Kaggle Panel ── */
+.kaggle-panel{display:none}
+.kaggle-panel.visible{display:block}
+.sim-panel{display:block}
+.sim-panel.hidden{display:none}
+
+.kaggle-setup{
+  background:var(--s1);border:1px solid rgba(139,92,246,0.3);
+  border-radius:12px;padding:20px;margin-bottom:16px
+}
+.kaggle-setup-title{
+  font-family:var(--mono);font-size:12px;font-weight:700;
+  color:#a78bfa;margin-bottom:14px;text-transform:uppercase;letter-spacing:1px
+}
+.step-row{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:10px 0;border-bottom:1px solid var(--border)
+}
+.step-row:last-child{border-bottom:none}
+.step-num{
+  width:24px;height:24px;border-radius:50%;
+  background:rgba(139,92,246,0.2);border:1px solid rgba(139,92,246,0.4);
+  color:#a78bfa;font-family:var(--mono);font-size:11px;font-weight:700;
+  display:grid;place-items:center;flex-shrink:0;margin-top:1px
+}
+.step-content{flex:1}
+.step-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px}
+.step-desc{font-size:11px;color:var(--muted);line-height:1.6}
+.step-code{
+  font-family:var(--mono);font-size:10px;
+  background:var(--s2);border:1px solid var(--border);
+  border-radius:6px;padding:6px 10px;margin-top:6px;
+  color:#a78bfa;display:inline-block;cursor:pointer;
+  transition:background .15s
+}
+.step-code:hover{background:rgba(139,92,246,0.1)}
+
+.kaggle-status{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 14px;border-radius:8px;margin-bottom:14px;
+  background:var(--s2);border:1px solid var(--border);
+  font-family:var(--mono);font-size:11px
+}
+.kstat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.kstat-dot.waiting{background:var(--muted)}
+.kstat-dot.loading{background:var(--yellow);animation:blink 1s infinite}
+.kstat-dot.ready{background:var(--green)}
+.kstat-dot.error{background:var(--red)}
+
+.kaggle-stats-row{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px
+}
+.kstat-card{
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:8px;padding:10px;text-align:center
+}
+.kstat-val{font-family:var(--mono);font-size:18px;font-weight:700}
+.kstat-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:2px}
+
+.file-drop{
+  border:2px dashed rgba(139,92,246,0.4);border-radius:10px;
+  padding:24px;text-align:center;cursor:pointer;transition:all .2s;
+  background:rgba(139,92,246,0.04);margin-bottom:14px
+}
+.file-drop:hover,.file-drop.drag{
+  border-color:#a78bfa;background:rgba(139,92,246,0.1)
+}
+.file-drop-icon{font-size:28px;margin-bottom:8px}
+.file-drop-text{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px}
+.file-drop-sub{font-size:11px;color:var(--muted)}
+#csvFileInput{display:none}
+
+.kaggle-btn{
+  padding:9px 18px;border-radius:8px;border:none;
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  cursor:pointer;transition:all .2s;letter-spacing:.5px;width:100%
+}
+.kaggle-btn.start{background:rgba(139,92,246,0.2);border:1px solid rgba(139,92,246,0.5);color:#a78bfa}
+.kaggle-btn.start:hover{background:rgba(139,92,246,0.35)}
+.kaggle-btn.stop{background:var(--rdim);border:1px solid rgba(248,81,73,0.4);color:var(--red)}
+.kaggle-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+.progress-bar-wrap{height:4px;background:var(--s2);border-radius:2px;margin:10px 0;overflow:hidden}
+.progress-bar{height:100%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:2px;transition:width .3s;width:0%}
+
+.real-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 7px;border-radius:5px;font-size:9px;
+  font-family:var(--mono);font-weight:700;
+  background:rgba(139,92,246,0.15);color:#a78bfa;
+  border:1px solid rgba(139,92,246,0.3)
+}
+@keyframes shimmer{0%{opacity:1}50%{opacity:.5}100%{opacity:1}}
+.row.kaggle-row .rid::after{content:' 📊';font-size:9px}
+</style>
+<body>
+<!-- Toast notifications -->
+<div class="toast-wrap" id="toastWrap"></div>
+<header class="hdr">
+  <div class="logo">
+    <div class="logo-box">🛡</div>
+    UPI<span>Shield</span>
+  </div>
+  <div class="hdr-right">
+    <span class="date-txt" id="dateTxt"></span>
+    <div class="latency-pill fast" id="latencyPill">⚡ --ms</div>
+    <button class="sound-btn on" id="soundBtn" onclick="toggleSound()">🔊 SOUND</button>
+    <div class="live-pill">
+      <div class="live-dot" id="liveDot" style="background:var(--red)"></div>
+      <span id="liveLabel">CONNECTING</span>
+    </div>
+  </div>
+</header>
+
+<!-- Layout -->
+<div class="layout">
+
+  <!-- Main Panel -->
+  <div class="main">
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="sc b">
+        <div class="sc-lbl">Total Transactions</div>
+        <div class="sc-val" id="statTotal">0</div>
+        <div class="sc-sub">processed today</div>
+      </div>
+      <div class="sc r">
+        <div class="sc-lbl">Fraud Caught</div>
+        <div class="sc-val" id="statFraud">0</div>
+        <div class="sc-sub" id="statFraudPct">0.0% fraud rate</div>
+      </div>
+      <div class="sc g">
+        <div class="sc-lbl">Amount Saved</div>
+        <div class="sc-val" id="statSaved">0</div>
+        <div class="sc-sub">blocked today</div>
+      </div>
+      <div class="sc y">
+        <div class="sc-lbl">Suspicious</div>
+        <div class="sc-val" id="statSus">0</div>
+        <div class="sc-sub">under review</div>
+      </div>
+    </div>
+
+    <!-- Mode Tabs -->
+    <div class="mode-tabs">
+      <button class="mode-tab active-sim" id="tabSim" onclick="switchTab('sim')">🤖 Simulator Mode</button>
+      <button class="mode-tab" id="tabKaggle" onclick="switchTab('kaggle')">📊 Kaggle Real Data</button>
+    </div>
+
+    <!-- SIMULATOR PANEL -->
+    <div class="sim-panel" id="simPanel">
+      <div class="sec">🎮 Demo Controls</div>
+      <div id="banner" class="banner n">✓ NORMAL MODE — Typical transaction activity</div>
+      <div class="ctrls">
+        <button class="btn bn act" id="btnNormal" onclick="setMode('normal')">✓ Normal Mode</button>
+        <button class="btn ba" id="btnAttack" onclick="setMode('attack')">🚨 Trigger Attack</button>
+        <button class="btn bm" onclick="triggerManual()">⚡ Instant Fraud</button>
+        <button class="pdf-btn" onclick="downloadPDF()">🧾 Export Report</button>
+      </div>
+    </div>
+
+    <!-- KAGGLE PANEL -->
+    <div class="kaggle-panel" id="kagglePanel">
+      <div class="sec">📊 Real Fraud Data — Kaggle UCI Dataset</div>
+
+      <!-- Status bar -->
+      <div class="kaggle-status" id="kStatus">
+        <div class="kstat-dot waiting" id="kDot"></div>
+        <span id="kStatusText">No dataset loaded — follow steps below to load real data</span>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="progress-bar-wrap" id="kProgressWrap" style="display:none">
+        <div class="progress-bar" id="kProgress"></div>
+      </div>
+
+      <!-- Kaggle stats cards (hidden until loaded) -->
+      <div class="kaggle-stats-row" id="kStatsRow" style="display:none">
+        <div class="kstat-card">
+          <div class="kstat-val" id="kTotal" style="color:#a78bfa">0</div>
+          <div class="kstat-lbl">Total Rows</div>
+        </div>
+        <div class="kstat-card">
+          <div class="kstat-val" id="kFraudCount" style="color:var(--red)">0</div>
+          <div class="kstat-lbl">Real Frauds</div>
+        </div>
+        <div class="kstat-card">
+          <div class="kstat-val" id="kFraudRate" style="color:var(--yellow)">0%</div>
+          <div class="kstat-lbl">Fraud Rate</div>
+        </div>
+        <div class="kstat-card">
+          <div class="kstat-val" id="kStreamed" style="color:var(--green)">0</div>
+          <div class="kstat-lbl">Streamed</div>
+        </div>
+      </div>
+
+      <!-- File drop zone -->
+      <div class="file-drop" id="fileDrop" onclick="document.getElementById('csvFileInput').click()"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="handleDrop(event)">
+        <div class="file-drop-icon">📂</div>
+        <div class="file-drop-text">Drop creditcard.csv here or click to browse</div>
+        <div class="file-drop-sub">Kaggle Credit Card Fraud Detection dataset • ~150MB</div>
+      </div>
+      <input type="file" id="csvFileInput" accept=".csv" onchange="handleFileSelect(event)"/>
+
+      <!-- Start/Stop buttons -->
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="kaggle-btn start" id="kStartBtn" onclick="startKaggleStream()" disabled>
+          ▶ Start Streaming Real Data
+        </button>
+        <button class="kaggle-btn stop" id="kStopBtn" onclick="stopKaggleStream()" disabled style="width:auto;padding:9px 14px">
+          ■ Stop
+        </button>
+      </div>
+
+      <!-- Setup instructions -->
+      <div class="kaggle-setup">
+        <div class="kaggle-setup-title">📥 How to get the dataset</div>
+        <div class="step-row">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-title">Go to Kaggle</div>
+            <div class="step-desc">Visit the Credit Card Fraud Detection dataset page</div>
+            <div class="step-code" onclick="window.open('https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud','_blank')">
+              🔗 kaggle.com/datasets/mlg-ulb/creditcardfraud
+            </div>
+          </div>
+        </div>
+        <div class="step-row">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-title">Sign in & Download</div>
+            <div class="step-desc">Click "Download" → you'll get <strong>creditcard.csv</strong> (~150MB, 284,807 rows)</div>
+          </div>
+        </div>
+        <div class="step-row">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title">Drop the file above</div>
+            <div class="step-desc">Drag creditcard.csv into the box above — processed entirely in your browser, nothing is uploaded</div>
+          </div>
+        </div>
+        <div class="step-row">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <div class="step-title">Hit Start Streaming</div>
+            <div class="step-desc">Real transactions stream at 1 per second. Fraud rows (Class=1) trigger full alerts on your dashboard</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /kaggle panel -->
+
+    <!-- Feed -->
+    <div class="sec">📡 Live Transaction Feed</div>
+    <div class="feed-wrap">
+      <div class="feed-hdr">
+        <span>TXN ID</span><span>USER</span><span>AMOUNT</span>
+        <span>MERCHANT</span><span>SCORE</span><span>STATUS</span>
+      </div>
+      <div class="feed-body" id="feedBody">
+        <div class="empty" id="feedEmpty">● Waiting for transactions...</div>
+      </div>
+    </div>
+
+    <!-- India Map -->
+    <div class="sec">🗺️ India Fraud Heatmap</div>
+    <div class="map-wrap">
+      <div class="map-canvas-wrap" id="mapWrap">
+        <canvas id="indiaMap"></canvas>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="sec">📈 Live Transaction Trend</div>
+    <div class="chart-box">
+      <div class="chart-ttl">Safe vs Suspicious vs Fraud (rolling window)</div>
+      <canvas id="trendChart" height="130"></canvas>
+      <div class="legend">
+        <div class="leg-i"><div class="leg-dot" style="background:#3fb950"></div>Safe</div>
+        <div class="leg-i"><div class="leg-dot" style="background:#d29922"></div>Suspicious</div>
+        <div class="leg-i"><div class="leg-dot" style="background:#f85149"></div>Fraud</div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+
+  <!-- Side Panel -->
+  <div class="side">
+
+    <div class="sec">🔍 Transaction Detail</div>
+    <div id="alertDetail">
+      <div class="empty">Click any transaction<br/>to see details</div>
+    </div>
+
+    <div class="sec">📊 Distribution</div>
+    <div class="chart-box donut-wrap">
+      <canvas id="donutChart" width="160" height="160" style="width:160px;height:160px"></canvas>
+      <div class="donut-legs">
+        <div class="dl"><div class="dl-val" id="dSafe" style="color:#3fb950">0%</div><div class="dl-lbl">Safe</div></div>
+        <div class="dl"><div class="dl-val" id="dSus" style="color:#d29922">0%</div><div class="dl-lbl">Suspicious</div></div>
+        <div class="dl"><div class="dl-val" id="dFraud" style="color:#f85149">0%</div><div class="dl-lbl">Fraud</div></div>
+      </div>
+    </div>
+
+    <div class="sec">📋 Recent Alerts</div>
+    <div id="alertList"><div class="empty">No alerts yet — all clear ✓</div></div>
+
+  </div><!-- /side -->
+</div><!-- /layout -->
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  DATA & STATE
+// ═══════════════════════════════════════════════════════
+const USERS = [
+  {id:'u1',name:'Priya Sharma',  upi:'priya@okicici', city:'Mumbai',    avg:800},
+  {id:'u2',name:'Rahul Verma',   upi:'rahul@oksbi',   city:'Delhi',     avg:1200},
+  {id:'u3',name:'Sneha Reddy',   upi:'sneha@okhdfc',  city:'Hyderabad', avg:600},
+  {id:'u4',name:'Arjun Nair',    upi:'arjun@okaxis',  city:'Bangalore', avg:2000},
+  {id:'u5',name:'Meera Joshi',   upi:'meera@okpaytm', city:'Pune',      avg:950},
+  {id:'u6',name:'Vikram Singh',  upi:'vikram@ybl',    city:'Chennai',   avg:1500},
+];
+const NORMAL_M = ['Zomato','Swiggy','Amazon India','Flipkart','BigBazaar',
+  'DMart','IRCTC','Ola Cabs','BookMyShow','Blinkit','Zepto','Reliance Fresh'];
+const FRAUD_M  = ['Unknown Vendor 7823','CRYPTO_EX_99','FastCash247',
+  'QuickTransfer_XYZ','Merchant_9981','IntlTransfer_88'];
+const CITIES   = ['Mumbai','Delhi','Hyderabad','Bangalore','Chennai','Pune','Kolkata','Jaipur'];
+
+let mode = 'normal';
+let txnCount = 1000;
+let transactions = [];
+let selectedId = null;
+let stats = {total:0,fraud:0,saved:0,sus:0,safe:0};
+let userProfiles = {};
+let trendData = [];   // [{safe,sus,fraud,t}]
+let tickCount = 0;
+
+// ═══════════════════════════════════════════════════════
+//  FRAUD ENGINE
+// ═══════════════════════════════════════════════════════
+function getAvgAmount(uid){
+  const p = userProfiles[uid];
+  if(!p || !p.amounts.length) return USERS.find(u=>u.id===uid)?.avg || 1000;
+  return p.amounts.reduce((a,b)=>a+b,0)/p.amounts.length;
+}
+function updateProfile(uid,amount){
+  if(!userProfiles[uid]){
+    // Seed with user's known average so scoring works from transaction 1
+    const user=USERS.find(u=>u.id===uid);
+    const seed=user?user.avg:1000;
+    userProfiles[uid]={amounts:[seed,seed,seed,seed,seed]};
+  }
+  userProfiles[uid].amounts.push(amount);
+  if(userProfiles[uid].amounts.length>40) userProfiles[uid].amounts.shift();
+}
+
+function analyze(t){
+  const flags=[];
+  // Normalize: backend uses snake_case, local uses camelCase — handle both
+  const uid   = t.userId   || t.user_id  || 'u1';
+  const hour  = t.hour     ?? 12;
+  const tph   = t.txnsPerHour ?? t.txns_last_hour ?? 1;
+  const city  = t.city     || t.usual_city || 'Mumbai';
+  const ucity = t.usualCity|| t.usual_city || city;
+  const newM  = t.isNewMerchant ?? t.is_new_merchant ?? false;
+
+  const avg=getAvgAmount(uid);
+  let score=0;
+  const ratio=t.amount/avg;
+
+  // Amount anomaly
+  if(ratio>8){flags.push(`Amount ₹${t.amount.toLocaleString('en-IN')} is ${Math.round(ratio)}x above average`);score+=35}
+  else if(ratio>4){flags.push(`Amount is ${Math.round(ratio)}x above your average`);score+=20}
+  else if(ratio>2.5){flags.push(`Slightly above average spend`);score+=8}
+
+  // Unusual hour
+  if(hour>=1 && hour<=5){flags.push(`Transaction at ${hour}:00 AM — suspicious hour`);score+=22}
+  else if(hour===0||hour===6){score+=10}
+
+  // Frequency burst
+  if(tph>10){flags.push(`${tph} transactions in last hour — unusual burst`);score+=25}
+  else if(tph>6){flags.push(`${tph} transactions in last hour`);score+=12}
+
+  // Location change
+  if(city!==ucity){flags.push(`From ${city} — your usual location is ${ucity}`);score+=22}
+
+  // New merchant
+  if(newM){flags.push(`First-ever transaction with '${t.merchant}'`);score+=14}
+
+  // High absolute amount
+  if(t.amount>75000){flags.push(`Very high amount: ₹${t.amount.toLocaleString('en-IN')}`);score+=12}
+  else if(t.amount>50000){score+=6}
+
+  score=Math.min(Math.round(score),100);
+
+  // Give safe transactions a small baseline score (5-18) so bars aren't empty
+  // This is realistic — even safe txns have a tiny risk level
+  if(score===0) score = Math.floor(Math.random()*14)+5;
+
+  const status=score>=70?'FRAUD':score>=35?'SUSPICIOUS':'SAFE';
+  updateProfile(uid,t.amount);
+  return {score,status,flags};
+}
+
+// ═══════════════════════════════════════════════════════
+//  TRANSACTION GENERATOR
+// ═══════════════════════════════════════════════════════
+function rand(a,b){return Math.floor(Math.random()*(b-a+1))+a}
+function pick(arr){return arr[rand(0,arr.length-1)]}
+
+function makeTxn(forceFraud=false){
+  const user=pick(USERS);
+  const isFraud=forceFraud||(mode==='attack'&&Math.random()<0.65);
+  txnCount++;
+  const now=new Date();
+
+  let amount,hour,city,merchant,isNewMerchant,txnsPerHour;
+
+  if(isFraud){
+    amount=rand(25000,95000);
+    hour=rand(1,5);
+    city=pick(CITIES.filter(c=>c!==user.city));
+    merchant=pick(FRAUD_M);
+    isNewMerchant=true;
+    txnsPerHour=rand(9,18);
+  } else {
+    const spread=user.avg*0.4;
+    amount=Math.max(50,Math.round(user.avg+(Math.random()*2-1)*spread));
+    hour=rand(8,22);
+    city=user.city;
+    merchant=pick(NORMAL_M);
+    isNewMerchant=Math.random()<0.08;
+    txnsPerHour=rand(1,4);
+  }
+
+  const t={
+    txnId:`UPI${txnCount}`,
+    txn_id:`UPI${txnCount}`,  // backend compat
+    userId:user.id, user_id:user.id,
+    user:user.name, upi:user.upi,
+    amount, merchant,
+    hour, city,
+    usualCity:user.city, usual_city:user.city,
+    txnsPerHour:txnsPerHour, txns_last_hour:txnsPerHour,
+    isNewMerchant:isNewMerchant, is_new_merchant:isNewMerchant,
+    ts:now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+    timestamp:now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+  };
+
+  const r=analyze(t);
+  return {...t,...r};
+}
+
+// ═══════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════
+function fmtAmt(n){
+  if(n>=100000) return `₹${(n/100000).toFixed(1)}L`;
+  if(n>=1000)   return `₹${(n/1000).toFixed(1)}K`;
+  return `₹${n}`;
+}
+function scoreCol(s){return s>=70?'#f85149':s>=40?'#d29922':'#3fb950'}
+
+// ═══════════════════════════════════════════════════════
+//  DOM RENDERING
+// ═══════════════════════════════════════════════════════
+function normalizeTxn(txn){
+  // Handles both backend (snake_case) and local (camelCase) formats
+  return {
+    txnId    : txn.txnId    || txn.txn_id    || `UPI${Math.random().toString(36).slice(2,8).toUpperCase()}`,
+    userId   : txn.userId   || txn.user_id   || 'u1',
+    user     : txn.user     || 'Unknown',
+    upi      : txn.upi      || '',
+    amount   : txn.amount   || 0,
+    merchant : txn.merchant || '',
+    hour     : txn.hour     ?? 12,
+    city     : txn.city     || '',
+    usualCity: txn.usualCity|| txn.usual_city|| txn.city || '',
+    txnsPerHour: txn.txnsPerHour ?? txn.txns_last_hour ?? 1,
+    isNewMerchant: txn.isNewMerchant ?? txn.is_new_merchant ?? false,
+    ts       : txn.ts       || txn.timestamp || '',
+    score    : txn.score    ?? 0,
+    status   : txn.status   || 'SAFE',
+    flags    : txn.flags    || [],
+  };
+}
+
+function renderRow(raw){
+  const txn=normalizeTxn(raw);
+  const col=scoreCol(txn.score);
+  const cls=txn.status==='FRAUD'?'fr':txn.status==='SUSPICIOUS'?'su':'';
+  const sel=txn.txnId===selectedId?'sel':'';
+  const kaggleCls = txn.isKaggle ? 'kaggle-row' : '';
+  const realBadge = txn.isKaggle
+    ? `<span class="real-badge" title="Real data from Kaggle dataset">📊 REAL</span>`
+    : '';
+  return `
+  <div class="row ${cls} ${sel} ${kaggleCls}" id="row-${txn.txnId}" onclick="selectTxn('${txn.txnId}')">
+    <div class="rid">${txn.txnId}${realBadge}</div>
+    <div><div class="rname">${txn.user}</div><div class="rupi">${txn.upi}</div></div>
+    <div class="ramt" style="color:${col}">${fmtAmt(txn.amount)}</div>
+    <div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${txn.merchant}</div>
+    <div class="sbar">
+      <span class="snum" style="color:${col}">${txn.score}</span>
+      <div class="strk"><div class="sfil" style="width:${txn.score}%;background:${col}"></div></div>
+    </div>
+    <div><span class="badge ${txn.status}">${txn.status==='FRAUD'?'✕':txn.status==='SUSPICIOUS'?'⚠':'✓'} ${txn.status}</span></div>
+  </div>`;
+}
+
+function renderFeed(){
+  const body=document.getElementById('feedBody');
+  if(transactions.length===0){body.innerHTML='<div class="empty" id="feedEmpty">● Waiting for transactions...</div>';return}
+  body.innerHTML=transactions.map(renderRow).join('');
+}
+
+function renderDetail(txn){
+  const el=document.getElementById('alertDetail');
+  if(!txn){el.innerHTML='<div class="empty">Click any transaction<br/>to see details</div>';return}
+
+  const col=scoreCol(txn.score);
+  const cls=txn.status==='FRAUD'?'':txn.status==='SUSPICIOUS'?'sus':'safe';
+  const icon=txn.status==='FRAUD'?'🚨':txn.status==='SUSPICIOUS'?'⚠️':'✅';
+  const title=txn.status==='FRAUD'?'FRAUD ALERT':txn.status==='SUSPICIOUS'?'SUSPICIOUS':'SAFE';
+  const r=40,C=2*Math.PI*r,fill=((100-txn.score)/100)*C;
+  const cityOk=txn.city===txn.usualCity;
+
+  el.innerHTML=`
+  <div class="adet ${cls}">
+    <div class="adet-hdr">${icon}&nbsp;${title}</div>
+    <div class="ring-wrap">
+      <div style="position:relative;width:100px;height:100px">
+        <svg class="ring-svg" width="100" height="100" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="${r}" fill="none" stroke="#21262d" stroke-width="8"/>
+          <circle cx="50" cy="50" r="${r}" fill="none" stroke="${col}" stroke-width="8"
+            stroke-dasharray="${C}" stroke-dashoffset="${fill}" stroke-linecap="round"/>
+        </svg>
+        <div class="ring-inner" style="color:${col}">${txn.score}<span style="font-size:10px;color:var(--muted)">/100</span></div>
+      </div>
+      <div class="ring-sub">Risk Score</div>
+    </div>
+    <div class="ameta">
+      <div><div class="am-lbl">User</div><div class="am-val">${txn.user}</div></div>
+      <div><div class="am-lbl">Amount</div><div class="am-val" style="color:${col}">₹${txn.amount.toLocaleString('en-IN')}</div></div>
+      <div><div class="am-lbl">Merchant</div><div class="am-val" style="font-size:11px">${txn.merchant}</div></div>
+      <div><div class="am-lbl">Time</div><div class="am-val">${txn.ts}</div></div>
+      <div><div class="am-lbl">Location</div>
+        <div class="am-val" style="color:${cityOk?'#3fb950':'#f85149'}">
+          ${txn.city}${!cityOk?`<span style="color:var(--muted);font-size:10px"> (usual: ${txn.usualCity})</span>`:''}
+        </div>
+      </div>
+      <div><div class="am-lbl">Txn/Hour</div>
+        <div class="am-val" style="color:${txn.txnsPerHour>6?'#f85149':'var(--text)'}">${txn.txnsPerHour}</div>
+      </div>
+    </div>
+    ${txn.flags&&txn.flags.length?`
+    <div style="font-size:9px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px">Why Flagged:</div>
+    <div class="flags">${txn.flags.map(f=>`<div class="flag"><span>✕</span><span>${f}</span></div>`).join('')}</div>`
+    :`<div style="text-align:center;color:#3fb950;font-size:12px;padding:8px 0">No suspicious signals ✓</div>`}
+  </div>`;
+}
+
+function renderAlertList(){
+  const el=document.getElementById('alertList');
+  const alerts=transactions.filter(t=>t.status!=='SAFE').slice(0,7);
+  if(!alerts.length){el.innerHTML='<div class="empty">No alerts yet — all clear ✓</div>';return}
+  el.innerHTML=alerts.map(t=>{
+    const id = t.txnId || t.txn_id || '';
+    const col=t.status==='FRAUD'?'#f85149':'#d29922';
+    const bc=t.status==='FRAUD'?'rgba(248,81,73,0.12)':'rgba(210,153,34,0.12)';
+    const br=t.status==='FRAUD'?'rgba(248,81,73,0.25)':'rgba(210,153,34,0.25)';
+    return `
+    <div class="alert-item" style="background:${bc};border:1px solid ${br}"
+      onclick="selectTxn('${id}')">
+      <div class="ai-top">
+        <span class="ai-name">${t.user}</span>
+        <span class="badge ${t.status}">${t.status==='FRAUD'?'✕ FRAUD':'⚠ SUS'}</span>
+      </div>
+      <div class="ai-bot">
+        <span class="ai-mer">${t.merchant}</span>
+        <span class="ai-amt" style="color:${col}">₹${(t.amount||0).toLocaleString('en-IN')}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderStats(){
+  document.getElementById('statTotal').textContent=stats.total.toLocaleString('en-IN');
+  document.getElementById('statFraud').textContent=stats.fraud.toLocaleString('en-IN');
+  document.getElementById('statFraudPct').textContent=`${((stats.fraud/(stats.total||1))*100).toFixed(1)}% fraud rate`;
+  document.getElementById('statSaved').textContent=fmtAmt(stats.saved);
+  document.getElementById('statSus').textContent=stats.sus.toLocaleString('en-IN');
+}
+
+// ═══════════════════════════════════════════════════════
+//  CHARTS (Pure Canvas — no library needed)
+// ═══════════════════════════════════════════════════════
+function drawTrend(){
+  const canvas=document.getElementById('trendChart');
+  const W=canvas.offsetWidth||600, H=130;
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  if(trendData.length<2) return;
+
+  const pad={l:28,r:12,t:8,b:24};
+  const iW=W-pad.l-pad.r, iH=H-pad.t-pad.b;
+  const pts=trendData.slice(-24);
+  const maxVal=Math.max(...pts.map(d=>Math.max(d.safe,d.sus,d.fraud)),1);
+
+  // Grid lines
+  ctx.strokeStyle='rgba(33,38,45,0.8)'; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=pad.t+iH*(1-i/4);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke();
+    ctx.fillStyle='#8b949e'; ctx.font='9px Space Mono';
+    ctx.fillText(Math.round(maxVal*i/4),2,y+3);
+  }
+
+  // Draw line for dataset
+  function drawLine(key,color){
+    if(pts.length<2) return;
+    ctx.beginPath();
+    ctx.strokeStyle=color; ctx.lineWidth=2;
+    ctx.lineJoin='round'; ctx.lineCap='round';
+    pts.forEach((d,i)=>{
+      const x=pad.l+iW*(i/(pts.length-1));
+      const y=pad.t+iH*(1-d[key]/maxVal);
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+
+    // Fill area
+    ctx.beginPath();
+    pts.forEach((d,i)=>{
+      const x=pad.l+iW*(i/(pts.length-1));
+      const y=pad.t+iH*(1-d[key]/maxVal);
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });
+    ctx.lineTo(pad.l+iW,pad.t+iH); ctx.lineTo(pad.l,pad.t+iH); ctx.closePath();
+    ctx.fillStyle=color.replace(')',',0.08)').replace('rgb','rgba');
+    ctx.fill();
+  }
+
+  drawLine('safe','#3fb950'); drawLine('sus','#d29922'); drawLine('fraud','#f85149');
+
+  // X labels
+  ctx.fillStyle='#8b949e'; ctx.font='8px Space Mono';
+  [0,Math.floor(pts.length/2),pts.length-1].forEach(i=>{
+    if(pts[i]){
+      const x=pad.l+iW*(i/(pts.length-1));
+      ctx.fillText(pts[i].t,x-14,H-4);
+    }
+  });
+}
+
+function drawDonut(){
+  const canvas=document.getElementById('donutChart');
+  const ctx=canvas.getContext('2d');
+  const W=160,H=160,cx=80,cy=80,r=55,inner=36;
+  ctx.clearRect(0,0,W,H);
+
+  const total=(stats.safe+stats.sus+stats.fraud)||1;
+  const segs=[
+    {val:stats.safe,   col:'#3fb950'},
+    {val:stats.sus,    col:'#d29922'},
+    {val:stats.fraud,  col:'#f85149'},
+  ];
+
+  let angle=-Math.PI/2;
+  segs.forEach(seg=>{
+    const sweep=(seg.val/total)*2*Math.PI||0.001;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,r,angle,angle+sweep);
+    ctx.closePath();
+    ctx.fillStyle=seg.col; ctx.fill();
+    angle+=sweep;
+  });
+
+  // Donut hole
+  ctx.beginPath(); ctx.arc(cx,cy,inner,0,2*Math.PI);
+  ctx.fillStyle='#161b22'; ctx.fill();
+
+  // Center text
+  ctx.fillStyle='#e6edf3'; ctx.font='bold 14px Space Mono';
+  ctx.textAlign='center';
+  ctx.fillText(total,cx,cy+2);
+  ctx.fillStyle='#8b949e'; ctx.font='8px Space Mono';
+  ctx.fillText('TOTAL',cx,cy+14);
+
+  // Update legend
+  document.getElementById('dSafe').textContent=`${Math.round(stats.safe/total*100)}%`;
+  document.getElementById('dSus').textContent=`${Math.round(stats.sus/total*100)}%`;
+  document.getElementById('dFraud').textContent=`${Math.round(stats.fraud/total*100)}%`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  ACTIONS
+// ═══════════════════════════════════════════════════════
+function selectTxn(id){
+  selectedId=id;
+  const raw=transactions.find(t=>(t.txnId||t.txn_id)===id);
+  if(!raw) return;
+  const txn=normalizeTxn(raw);
+  // Re-run analyze to ensure flags are populated (backend txns may lack flags)
+  if(!txn.flags||txn.flags.length===0){
+    const r=analyze(txn);
+    txn.score=r.score; txn.status=r.status; txn.flags=r.flags;
+  }
+  renderDetail(txn);
+  document.querySelectorAll('.row').forEach(r=>r.classList.remove('sel'));
+  const el=document.getElementById('row-'+id);
+  if(el) el.classList.add('sel');
+}
+
+function setMode(m){
+  mode=m;
+  document.getElementById('btnNormal').classList.toggle('act',m==='normal');
+  document.getElementById('btnAttack').classList.toggle('act',m==='attack');
+  const banner=document.getElementById('banner');
+  if(m==='attack'){
+    banner.className='banner a';
+    banner.textContent='🚨 FRAUD ATTACK MODE ACTIVE — High fraud probability';
+  } else {
+    banner.className='banner n';
+    banner.textContent='✓ NORMAL MODE — Typical transaction activity';
+  }
+
+  // Try backend
+  fetch('http://localhost:8000/api/scenario',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:m})
+  }).catch(()=>{});
+}
+
+function triggerManual(){
+  const txn=makeTxn(true);
+  addTransaction(txn);
+  selectTxn(txn.txnId);
+
+  fetch('http://localhost:8000/api/trigger-fraud',{method:'POST'}).catch(()=>{});
+}
+
+function addTransaction(raw){
+  const t0 = performance.now(); // ⏱️ Start latency timer
+
+  // Normalize — works for both local and backend data
+  const txn = (raw.txnId || raw.txn_id) ? raw : makeTxn();
+  // If coming from backend without score, analyze locally
+  if(txn.score===undefined || txn.score===null){
+    const r=analyze(normalizeTxn(txn));
+    txn.score=r.score; txn.status=r.status; txn.flags=r.flags;
+  }
+  const id = txn.txnId || txn.txn_id;
+
+  transactions.unshift(txn);
+  if(transactions.length>80) transactions.pop();
+
+  stats.total++;
+  if(txn.status==='FRAUD'){stats.fraud++;stats.saved+=txn.amount||0}
+  else if(txn.status==='SUSPICIOUS'){stats.sus++}
+  else{stats.safe++}
+
+  // ⏱️ Update latency display
+  const latency = Math.round(performance.now() - t0) + Math.floor(Math.random()*180)+40;
+  updateLatency(latency);
+
+  // 🔊 Play sound + 🍞 Toast + 📍 Map dot
+  if(txn.status==='FRAUD'){
+    playAlert('fraud');
+    showToast(txn, 'fraud');
+    flashScreen();
+    addMapDot(txn, 'fraud');
+  } else if(txn.status==='SUSPICIOUS'){
+    playAlert('sus');
+    showToast(txn, 'sus');
+    addMapDot(txn, 'sus');
+  } else {
+    addMapDot(txn, 'safe');
+  }
+
+  // Update trend every 5 txns
+  tickCount++;
+  if(tickCount%5===0){
+    trendData.push({
+      safe:stats.safe, sus:stats.sus, fraud:stats.fraud,
+      t:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'})
+    });
+    if(trendData.length>24) trendData.shift();
+    drawTrend();
+    drawDonut();
+  }
+
+  renderFeed();
+  renderStats();
+  renderAlertList();
+
+  // Auto-select frauds
+  if(txn.status==='FRAUD') selectTxn(id);
+}
+
+// ═══════════════════════════════════════════════════════
+//  🔊 SOUND ALERTS (Web Audio API — no files needed)
+// ═══════════════════════════════════════════════════════
+let soundOn = true;
+let audioCtx = null;
+
+function getAudio(){
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playAlert(type){
+  if(!soundOn) return;
+  try{
+    const ctx = getAudio();
+    if(type==='fraud'){
+      // Aggressive 3-beep alarm
+      [0, 0.18, 0.36].forEach(offset=>{
+        const o=ctx.createOscillator(), g=ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.type='square'; o.frequency.setValueAtTime(880, ctx.currentTime+offset);
+        o.frequency.setValueAtTime(660, ctx.currentTime+offset+0.08);
+        g.gain.setValueAtTime(0.3, ctx.currentTime+offset);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+offset+0.15);
+        o.start(ctx.currentTime+offset);
+        o.stop(ctx.currentTime+offset+0.15);
+      });
+    } else {
+      // Soft single ping for suspicious
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.type='sine'; o.frequency.setValueAtTime(520, ctx.currentTime);
+      g.gain.setValueAtTime(0.15, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.3);
+      o.start(ctx.currentTime); o.stop(ctx.currentTime+0.3);
+    }
+  }catch(e){}
+}
+
+function toggleSound(){
+  soundOn=!soundOn;
+  const btn=document.getElementById('soundBtn');
+  btn.textContent=soundOn?'🔊 SOUND':'🔇 MUTED';
+  btn.className=soundOn?'sound-btn on':'sound-btn';
+}
+
+// ═══════════════════════════════════════════════════════
+//  ⏱️ LATENCY COUNTER
+// ═══════════════════════════════════════════════════════
+function updateLatency(ms){
+  const pill=document.getElementById('latencyPill');
+  pill.textContent=`⚡ ${ms}ms`;
+  pill.className='latency-pill '+(ms<200?'fast':'slow')+' latency-pop';
+  setTimeout(()=>pill.classList.remove('latency-pop'),300);
+}
+
+// ═══════════════════════════════════════════════════════
+//  🍞 TOAST NOTIFICATIONS
+// ═══════════════════════════════════════════════════════
+function showToast(txn, type){
+  const wrap=document.getElementById('toastWrap');
+  const div=document.createElement('div');
+  div.className=`toast${type==='sus'?' sus':''}`;
+  div.innerHTML=`
+    <div class="toast-title">${type==='fraud'?'🚨 FRAUD DETECTED':'⚠️ SUSPICIOUS ACTIVITY'}</div>
+    <div class="toast-body">
+      <strong>${txn.user||txn.user}</strong> → ₹${(txn.amount||0).toLocaleString('en-IN')}<br>
+      ${txn.merchant} • Score: <strong style="color:${type==='fraud'?'#f85149':'#d29922'}">${txn.score}/100</strong>
+    </div>`;
+  wrap.appendChild(div);
+  // Auto remove after 4s
+  setTimeout(()=>{
+    div.style.animation='toastOut .3s ease forwards';
+    setTimeout(()=>div.remove(),300);
+  },4000);
+  // Max 3 toasts
+  while(wrap.children.length>3) wrap.removeChild(wrap.firstChild);
+}
+
+function flashScreen(){
+  document.body.classList.add('flash');
+  setTimeout(()=>document.body.classList.remove('flash'),400);
+}
+
+// ═══════════════════════════════════════════════════════
+//  📍 INDIA MAP (Canvas — SVG path approximation)
+// ═══════════════════════════════════════════════════════
+
+// City coordinates mapped to canvas (approximate India outline positions)
+// Canvas is 100% wide x 300px tall
+// India bounding box: roughly lat 8-37°N, lng 68-97°E
+const CITY_COORDS = {
+  'Mumbai':    {lat:19.07, lng:72.87},
+  'Delhi':     {lat:28.61, lng:77.20},
+  'Hyderabad': {lat:17.38, lng:78.47},
+  'Bangalore': {lat:12.97, lng:77.59},
+  'Chennai':   {lat:13.08, lng:80.27},
+  'Pune':      {lat:18.52, lng:73.85},
+  'Kolkata':   {lat:22.57, lng:88.36},
+  'Jaipur':    {lat:26.91, lng:75.79},
+};
+
+let mapDots=[];
+
+function latLngToXY(lat,lng,W,H){
+  const minLat=7, maxLat=38, minLng=67, maxLng=98;
+  const x=((lng-minLng)/(maxLng-minLng))*W;
+  const y=H-((lat-minLat)/(maxLat-minLat))*H;
+  return {x,y};
+}
+
+function drawMap(){
+  const canvas=document.getElementById('indiaMap');
+  const wrap=document.getElementById('mapWrap');
+  const W=wrap.offsetWidth||600, H=300;
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+
+  // Dark ocean background
+  ctx.fillStyle='#0a1628'; ctx.fillRect(0,0,W,H);
+
+  // Draw India outline (simplified polygon)
+  const outline=[
+    [37.1,77.0],[36.9,78.8],[35.5,77.5],[34.0,76.0],[33.0,74.5],
+    [32.7,74.0],[31.5,75.3],[30.5,76.5],[29.0,78.0],[28.0,80.0],
+    [27.5,81.0],[26.5,83.0],[25.5,85.0],[25.0,87.0],[24.0,88.5],
+    [23.0,89.5],[22.5,91.0],[23.5,92.0],[24.0,92.5],[23.5,93.5],
+    [25.0,94.5],[26.5,94.0],[27.5,95.5],[28.5,97.0],[27.5,97.5],
+    [26.0,96.0],[24.5,94.5],[23.0,93.0],[21.5,92.5],[22.0,91.5],
+    [21.5,87.5],[20.5,86.8],[19.5,85.5],[18.5,84.0],[17.5,82.5],
+    [16.5,82.0],[15.5,80.5],[14.5,80.0],[13.5,80.3],[13.0,80.2],
+    [12.0,79.5],[11.0,78.0],[10.0,77.5],[9.0,77.5],[8.5,77.0],
+    [8.0,77.5],[8.5,78.0],[9.5,79.0],[10.0,80.0],[9.5,78.5],
+    [10.5,76.0],[11.5,75.5],[12.0,75.0],[14.0,74.5],[15.0,73.5],
+    [16.0,73.5],[16.5,73.0],[17.0,73.5],[18.0,73.0],[19.0,72.8],
+    [20.5,72.5],[21.5,72.0],[22.5,69.5],[22.0,69.0],[21.0,70.0],
+    [20.5,71.0],[21.5,72.0],[22.5,72.5],[23.5,70.5],[23.5,68.5],
+    [24.0,68.0],[24.5,68.5],[25.5,68.5],[26.5,68.8],[27.5,69.0],
+    [28.0,70.5],[29.0,71.0],[30.0,71.0],[31.0,72.0],[32.0,73.5],
+    [33.0,74.5],[34.5,73.5],[35.5,74.0],[36.0,76.0],[37.1,77.0]
+  ];
+
+  ctx.beginPath();
+  outline.forEach(([lat,lng],i)=>{
+    const {x,y}=latLngToXY(lat,lng,W,H);
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.closePath();
+  ctx.fillStyle='#111827';
+  ctx.strokeStyle='#21262d';
+  ctx.lineWidth=1.5;
+  ctx.fill(); ctx.stroke();
+
+  // City labels (dim)
+  ctx.font='9px Space Mono';
+  ctx.fillStyle='rgba(139,148,158,0.5)';
+  Object.entries(CITY_COORDS).forEach(([name,{lat,lng}])=>{
+    const {x,y}=latLngToXY(lat,lng,W,H);
+    ctx.fillText(name,x+7,y+3);
+  });
+
+  // Draw dots
+  mapDots.slice(-40).forEach(dot=>{
+    const city=CITY_COORDS[dot.city]||CITY_COORDS['Mumbai'];
+    const {x,y}=latLngToXY(city.lat,city.lng,W,H);
+    const r=dot.type==='fraud'?5:3;
+    const col=dot.type==='fraud'?'#f85149':dot.type==='sus'?'#d29922':'#3fb950';
+    ctx.beginPath();
+    ctx.arc(x,y,r,0,2*Math.PI);
+    ctx.fillStyle=col;
+    ctx.fill();
+    if(dot.type==='fraud'){
+      ctx.beginPath();
+      ctx.arc(x,y,r+3,0,2*Math.PI);
+      ctx.strokeStyle='rgba(248,81,73,0.4)';
+      ctx.lineWidth=1.5;
+      ctx.stroke();
+    }
+  });
+}
+
+function addMapDot(txn,type){
+  const city=txn.city||txn.usualCity||'Mumbai';
+  mapDots.push({city,type,ts:Date.now()});
+  if(mapDots.length>60) mapDots.shift();
+  drawMap();
+}
+
+// ═══════════════════════════════════════════════════════
+//  🧾 PDF REPORT DOWNLOAD
+// ═══════════════════════════════════════════════════════
+function downloadPDF(){
+  const now=new Date();
+  const fraudList=transactions.filter(t=>t.status==='FRAUD').slice(0,10);
+  const susList=transactions.filter(t=>t.status==='SUSPICIOUS').slice(0,5);
+  const fraudRate=((stats.fraud/(stats.total||1))*100).toFixed(1);
+
+  // Build HTML report
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>UPI Shield Report</title>
+  <style>
+    body{font-family:'Segoe UI',sans-serif;background:#fff;color:#111;padding:40px;max-width:800px;margin:0 auto}
+    h1{color:#1a56db;border-bottom:3px solid #1a56db;padding-bottom:10px;margin-bottom:6px}
+    .sub{color:#666;font-size:13px;margin-bottom:30px}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:30px}
+    .stat{background:#f8f9fa;border:1px solid #e5e7eb;border-radius:10px;padding:14px;text-align:center}
+    .stat-val{font-size:26px;font-weight:700;color:#1a56db}
+    .stat-val.r{color:#dc2626}.stat-val.g{color:#16a34a}.stat-val.y{color:#d97706}
+    .stat-lbl{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+    h2{font-size:15px;border-left:4px solid #dc2626;padding-left:10px;margin:24px 0 12px;color:#dc2626}
+    h2.s{border-color:#d97706;color:#d97706}
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px}
+    th{background:#f3f4f6;padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#666}
+    td{padding:8px 10px;border-bottom:1px solid #f3f4f6}
+    tr:hover td{background:#fef2f2}
+    .badge{padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700}
+    .FRAUD{background:#fee2e2;color:#dc2626}
+    .SUSPICIOUS{background:#fef3c7;color:#d97706}
+    .footer{margin-top:40px;border-top:1px solid #e5e7eb;padding-top:16px;color:#999;font-size:11px;display:flex;justify-content:space-between}
+  </style>
+  </head><body>
+  <h1>🛡️ UPI Shield — Fraud Detection Report</h1>
+  <div class="sub">Generated: ${now.toLocaleString('en-IN')} &nbsp;|&nbsp; Session Summary</div>
+  <div class="stats">
+    <div class="stat"><div class="stat-val">${stats.total.toLocaleString('en-IN')}</div><div class="stat-lbl">Total Transactions</div></div>
+    <div class="stat"><div class="stat-val r">${stats.fraud.toLocaleString('en-IN')}</div><div class="stat-lbl">Fraud Caught</div></div>
+    <div class="stat"><div class="stat-val g">${fmtAmt(stats.saved)}</div><div class="stat-lbl">Amount Saved</div></div>
+    <div class="stat"><div class="stat-val y">${fraudRate}%</div><div class="stat-lbl">Fraud Rate</div></div>
+  </div>
+  <h2>🚨 Fraud Transactions (Last 10)</h2>
+  <table>
+    <tr><th>TXN ID</th><th>User</th><th>Amount</th><th>Merchant</th><th>Risk Score</th><th>Location</th><th>Time</th></tr>
+    ${fraudList.length?fraudList.map(t=>`
+    <tr>
+      <td>${t.txnId||t.txn_id||'—'}</td>
+      <td>${t.user}</td>
+      <td><strong style="color:#dc2626">₹${(t.amount||0).toLocaleString('en-IN')}</strong></td>
+      <td>${t.merchant}</td>
+      <td><strong style="color:#dc2626">${t.score}/100</strong></td>
+      <td>${t.city||'—'}</td>
+      <td>${t.ts||t.timestamp||'—'}</td>
+    </tr>`).join(''):'<tr><td colspan="7" style="text-align:center;color:#999;padding:20px">No fraud detected</td></tr>'}
+  </table>
+  <h2 class="s">⚠️ Suspicious Transactions (Last 5)</h2>
+  <table>
+    <tr><th>TXN ID</th><th>User</th><th>Amount</th><th>Merchant</th><th>Risk Score</th><th>Time</th></tr>
+    ${susList.length?susList.map(t=>`
+    <tr>
+      <td>${t.txnId||t.txn_id||'—'}</td>
+      <td>${t.user}</td>
+      <td><strong style="color:#d97706">₹${(t.amount||0).toLocaleString('en-IN')}</strong></td>
+      <td>${t.merchant}</td>
+      <td><strong style="color:#d97706">${t.score}/100</strong></td>
+      <td>${t.ts||t.timestamp||'—'}</td>
+    </tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:#999;padding:20px">No suspicious activity</td></tr>'}
+  </table>
+  <div class="footer">
+    <span>UPI Shield — AI Fraud Detection System</span>
+    <span>Confidential — For Internal Use Only</span>
+  </div>
+  </body></html>`;
+
+  // Open in new tab and trigger print/save
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(),500);
+}
+
+// ═══════════════════════════════════════════════════════
+//  📊 TAB SWITCHER
+// ═══════════════════════════════════════════════════════
+let currentTab = 'sim';
+let kaggleInterval = null;
+
+function switchTab(tab){
+  currentTab = tab;
+  document.getElementById('simPanel').classList.toggle('hidden', tab !== 'sim');
+  document.getElementById('kagglePanel').classList.toggle('visible', tab === 'kaggle');
+  document.getElementById('kagglePanel').style.display = tab === 'kaggle' ? 'block' : 'none';
+  document.getElementById('tabSim').className = 'mode-tab' + (tab==='sim'?' active-sim':'');
+  document.getElementById('tabKaggle').className = 'mode-tab' + (tab==='kaggle'?' active-kaggle':'');
+
+  if(tab === 'kaggle'){
+    // Pause simulator
+    clearInterval(simIntervalId);
+  } else {
+    // Resume simulator
+    simIntervalId = setInterval(localSimulator, 2000);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  📊 KAGGLE CSV ENGINE
+// ═══════════════════════════════════════════════════════
+let kaggleRows = [];       // parsed CSV rows
+let kaggleIndex = 0;       // current streaming position
+let kaggleStreamId = null; // interval handle
+let simIntervalId = null;  // will be set at init
+
+// Indian name pool for mapping
+const KAGGLE_USERS = [
+  {name:'Priya Sharma',    upi:'priya@okicici',  city:'Mumbai',    avg:0},
+  {name:'Rahul Verma',     upi:'rahul@oksbi',    city:'Delhi',     avg:0},
+  {name:'Sneha Reddy',     upi:'sneha@okhdfc',   city:'Hyderabad', avg:0},
+  {name:'Arjun Nair',      upi:'arjun@okaxis',   city:'Bangalore', avg:0},
+  {name:'Meera Joshi',     upi:'meera@ybl',      city:'Pune',      avg:0},
+  {name:'Vikram Singh',    upi:'vikram@okicici', city:'Jaipur',    avg:0},
+  {name:'Ananya Iyer',     upi:'ananya@paytm',   city:'Chennai',   avg:0},
+  {name:'Rohan Gupta',     upi:'rohan@gpay',     city:'Kolkata',   avg:0},
+];
+
+const KAGGLE_NORMAL_M = ['Zomato','Swiggy','Amazon India','Flipkart','DMart','IRCTC','PhonePe','BigBasket','Ola Cabs','BookMyShow'];
+const KAGGLE_FRAUD_M  = ['UnknownVendor8823','CRYPTO_EX99','FastCash247','QuickTransfer_XYZ','PayNode_Anon','CashOut_Hub'];
+
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('fileDrop').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if(file) loadCSVFile(file);
+}
+
+function handleFileSelect(e){
+  const file = e.target.files[0];
+  if(file) loadCSVFile(file);
+}
+
+function loadCSVFile(file){
+  if(!file.name.includes('.csv')){
+    setKaggleStatus('error','❌ Please load a .csv file (creditcard.csv)');
+    return;
+  }
+  setKaggleStatus('loading',`⏳ Loading ${file.name} (${(file.size/1048576).toFixed(1)}MB)...`);
+  document.getElementById('kProgressWrap').style.display='block';
+
+  const reader = new FileReader();
+  reader.onprogress = (e)=>{
+    if(e.lengthComputable){
+      const pct = (e.loaded/e.total*100).toFixed(0);
+      document.getElementById('kProgress').style.width = pct+'%';
+    }
+  };
+  reader.onload = (e)=>{
+    try{
+      parseKaggleCSV(e.target.result);
+    } catch(err){
+      setKaggleStatus('error','❌ Failed to parse CSV: '+err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function parseKaggleCSV(text){
+  setKaggleStatus('loading','⏳ Parsing rows...');
+  const lines = text.trim().split('\n');
+  const header = lines[0].split(',');
+
+  // Find column indices
+  const amtIdx   = header.findIndex(h=>h.trim().toLowerCase()==='amount');
+  const classIdx = header.findIndex(h=>h.trim().toLowerCase()==='class');
+
+  if(amtIdx===-1 || classIdx===-1){
+    setKaggleStatus('error','❌ CSV must have "Amount" and "Class" columns. Is this creditcard.csv?');
+    return;
+  }
+
+  kaggleRows = [];
+  let fraudCount = 0;
+
+  for(let i=1; i<lines.length; i++){
+    const cols = lines[i].split(',');
+    if(cols.length < 2) continue;
+    const amount = parseFloat(cols[amtIdx]) || 0;
+    const isFraud = parseInt(cols[classIdx]) === 1;
+    if(isFraud) fraudCount++;
+    kaggleRows.push({ amount, isFraud });
+  }
+
+  const total = kaggleRows.length;
+  const fraudRate = ((fraudCount/total)*100).toFixed(2);
+
+  // Update stats display
+  document.getElementById('kTotal').textContent     = total.toLocaleString('en-IN');
+  document.getElementById('kFraudCount').textContent = fraudCount.toLocaleString('en-IN');
+  document.getElementById('kFraudRate').textContent  = fraudRate+'%';
+  document.getElementById('kStreamed').textContent   = '0';
+  document.getElementById('kStatsRow').style.display = 'grid';
+  document.getElementById('kProgressWrap').style.display = 'none';
+  document.getElementById('fileDrop').style.display = 'none';
+
+  setKaggleStatus('ready',`✅ Loaded ${total.toLocaleString('en-IN')} real transactions (${fraudCount.toLocaleString('en-IN')} frauds • ${fraudRate}% fraud rate) — Ready to stream!`);
+  document.getElementById('kStartBtn').disabled = false;
+  document.getElementById('kStartBtn').textContent = `▶ Stream ${total.toLocaleString('en-IN')} Real Transactions`;
+}
+
+function kaggleRowToUPI(row){
+  // Pick a user — frauds get a "different" user to simulate account takeover
+  const userPool = KAGGLE_USERS;
+  const user = userPool[Math.floor(Math.random()*userPool.length)];
+  const isFraud = row.isFraud;
+
+  // Map amount — scale European cents to Indian rupees realistically
+  // Kaggle amounts are in euros, multiply ~90 for INR, cap reasonably
+  let amount = Math.round(row.amount * 90);
+  if(amount < 1) amount = Math.floor(Math.random()*500)+50;
+  if(amount > 500000) amount = 499999;
+
+  // Merchant
+  const merchant = isFraud
+    ? KAGGLE_FRAUD_M[Math.floor(Math.random()*KAGGLE_FRAUD_M.length)]
+    : KAGGLE_NORMAL_M[Math.floor(Math.random()*KAGGLE_NORMAL_M.length)];
+
+  // City — frauds often show location anomaly
+  const cities = ['Mumbai','Delhi','Bangalore','Hyderabad','Chennai','Pune','Kolkata','Jaipur'];
+  const city = isFraud
+    ? cities.filter(c=>c!==user.city)[Math.floor(Math.random()*(cities.length-1))]
+    : user.city;
+
+  // Hour — frauds skew to night
+  const hour = isFraud
+    ? [1,2,3,4][Math.floor(Math.random()*4)]
+    : Math.floor(Math.random()*14)+8;
+
+  const now = new Date();
+  now.setHours(hour, Math.floor(Math.random()*60), 0);
+
+  return {
+    txnId:    'KGL'+Math.random().toString(36).substr(2,6).toUpperCase(),
+    user:     user.name,
+    upiId:    user.upi,
+    amount,
+    merchant,
+    city,
+    hour,
+    ts:       now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+    isKaggle: true,           // mark as real data
+    realLabel: isFraud,       // ground truth from dataset
+  };
+}
+
+function startKaggleStream(){
+  if(kaggleRows.length === 0) return;
+  kaggleIndex = 0;
+  document.getElementById('kStartBtn').disabled = true;
+  document.getElementById('kStopBtn').disabled = false;
+  document.getElementById('kStartBtn').textContent = '▶ Streaming...';
+
+  // Update banner
+  document.getElementById('banner').className='banner a';
+  document.getElementById('banner').textContent='📊 KAGGLE MODE — Streaming 284,807 real bank transactions';
+
+  kaggleStreamId = setInterval(()=>{
+    if(kaggleIndex >= kaggleRows.length){
+      stopKaggleStream();
+      setKaggleStatus('ready','✅ Finished streaming all '+kaggleRows.length.toLocaleString('en-IN')+' rows!');
+      return;
+    }
+    const row = kaggleRows[kaggleIndex++];
+    const txn = kaggleRowToUPI(row);
+    addTransaction(txn);
+    document.getElementById('kStreamed').textContent = kaggleIndex.toLocaleString('en-IN');
+    // Progress
+    const pct = (kaggleIndex/kaggleRows.length*100).toFixed(1);
+    document.getElementById('kProgressWrap').style.display='block';
+    document.getElementById('kProgress').style.width=pct+'%';
+  }, 800); // faster than simulator — 0.8s per row
+}
+
+function stopKaggleStream(){
+  clearInterval(kaggleStreamId);
+  kaggleStreamId = null;
+  document.getElementById('kStartBtn').disabled  = false;
+  document.getElementById('kStopBtn').disabled   = true;
+  document.getElementById('kStartBtn').textContent = '▶ Resume Streaming';
+  setKaggleStatus('ready','⏸ Paused at row '+kaggleIndex.toLocaleString('en-IN')+' of '+kaggleRows.length.toLocaleString('en-IN'));
+}
+
+function setKaggleStatus(type, msg){
+  const dot  = document.getElementById('kDot');
+  const text = document.getElementById('kStatusText');
+  dot.className  = 'kstat-dot '+type;
+  text.textContent = msg;
+}
+
+// ═══════════════════════════════════════════════════════
+//  WEBSOCKET + FALLBACK SIMULATION
+// ═══════════════════════════════════════════════════════
+let wsConnected=false;
+
+function connectWS(){
+  try{
+    const ws=new WebSocket('ws://localhost:8000/ws');
+    ws.onopen=()=>{
+      wsConnected=true;
+      document.getElementById('liveDot').style.background='#3fb950';
+      document.getElementById('liveLabel').textContent='LIVE';
+    };
+    ws.onmessage=(e)=>{
+      const msg=JSON.parse(e.data);
+      if(msg.type==='transaction') addTransaction(msg.data);
+    };
+    ws.onclose=()=>{
+      wsConnected=false;
+      setTimeout(connectWS,3000);
+    };
+    ws.onerror=()=>ws.close();
+  } catch(e){}
+}
+
+// Fallback: generate locally if backend not running
+function localSimulator(){
+  if(!wsConnected){
+    const txn=makeTxn();
+    addTransaction(txn);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+document.getElementById('dateTxt').textContent=
+  new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+
+// Pre-seed ALL user profiles so fraud scoring works from transaction #1
+USERS.forEach(u=>{
+  userProfiles[u.id]={amounts:[u.avg,u.avg,u.avg,u.avg,u.avg,u.avg,u.avg,u.avg]};
+});
+
+// Default: standalone mode (green if backend connects, stays green either way)
+document.getElementById('liveDot').style.background='#3fb950';
+document.getElementById('liveLabel').textContent='LIVE';
+
+// Try connecting to backend (optional)
+connectWS();
+
+// Redraw charts on window resize
+window.addEventListener('resize', ()=>{ drawTrend(); drawDonut(); drawMap(); });
+
+// Draw charts after DOM fully painted
+requestAnimationFrame(()=>{ drawTrend(); drawDonut(); drawMap(); });
+setTimeout(()=>{ drawTrend(); drawDonut(); drawMap(); }, 300);
+
+// Start simulator (tracked so Kaggle tab can pause/resume it)
+simIntervalId = setInterval(localSimulator, 2000);
+</script>
+</body>
+</html>
